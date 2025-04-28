@@ -1,59 +1,46 @@
-import subprocess
+import yt_dlp
+import whisper
 import os
-from openai import OpenAI
 
-import subprocess
-import os
-from openai import OpenAI
+def download_audio(url):
+    ydl_opts = {
+        'format': 'bestaudio/best',
+        'postprocessors': [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+            'preferredquality': '192',
+        }],
+        'outtmpl': 'audio', 
+        'verbose': False
+    }
 
-def download_audio(url, output_filename="audio.mp3"):
-    ffmpeg_location = "C:\\ffmpeg\\bin" # -> need install ffmpeg
-    comand = [
-        "yt-dlp",
-        "-x",  
-        "--audio-format", "mp3",  
-        "--ffmpeg-location", ffmpeg_location, 
-        "-o", output_filename,
-        url
-    ]
-    subprocess.run(comand, check=True)
-    return output_filename
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        ydl.download([url])
+    return 'audio.mp3'
 
-def transcribe_audio(api_key, audio_file_path, language="en"):
-    client = OpenAI(api_key=api_key)
-    audio_file = open(audio_file_path, "rb")
+def transcribe_audio(audio_file):
+    model = whisper.load_model('base')
+    
+    result = model.transcribe(audio_file)
+    
+    with open('transcribe_audio.txt', 'w', encoding='utf-8') as f:
+        f.write(result['text'])
+    
+    return result['text']
 
-    transcription = client.audio.transcriptions.create(
-        model="whisper-1",
-        file=audio_file,
-        response_format="text",
-        language=language 
-    )
-
-    return transcription 
-
-def main():  
-    api_openai = input("Your OpenAI API Key: ").strip()
-    url = input("Write the video URL: ").strip()
-    language = input("Write the language code (ex: 'en' or 'pt'): ").strip().lower()
-
-    try:
-        audio_path = download_audio(url)
-    except Exception as e:
-        print(f"Error downloading audio: {e}")
-        return
-
-    try:
-        transcribed_text = transcribe_audio(api_openai, audio_path, language)
-    except Exception as e:
-        print(f"Error transcribing audio: {e}")
-        return
-
-    print("\n=== Transcription Result ===\n")
-    print(transcribed_text)
-
-    if os.path.exists(audio_path):
-        os.remove(audio_path)
+def main():
+    video_url = input("Past URL to video: ")
+    
+    print("Download áudio...")
+    audio_file = download_audio(video_url)
+    
+    print("Transcribe áudio...")
+    transcription = transcribe_audio(audio_file)
+    
+    print("\nTranscribe:")
+    print(transcription)
+    
+    # os.remove(audio_file)
 
 if __name__ == "__main__":
     main()
